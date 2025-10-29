@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDF AI Reader — Pro Edition</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+<style>
+  *{font-family:'Poppins',sans-serif;}
+  body{
+    background:radial-gradient(circle at 10% 20%,#0f0f0f,#060606 90%);
+    color:#eee;overflow-x:hidden;
+  }
+  .glass{
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.1);
+    backdrop-filter:blur(20px);
+    border-radius:20px;
+    transition:all .4s ease;
+  }
+  .glass:hover{transform:translateY(-3px);border-color:rgba(255,255,255,0.25);}
+  .gradientText{
+    background:linear-gradient(90deg,#00ffff,#0077ff,#ff00ff);
+    -webkit-background-clip:text;
+    color:transparent;
+    animation:gradientMove 5s linear infinite;
+    background-size:200%;
+  }
+  @keyframes gradientMove{0%{background-position:0%}100%{background-position:200%}}
+  .btn{
+    background:linear-gradient(90deg,#0ff,#09f,#f0f);
+    padding:.6rem 1.4rem;
+    border-radius:12px;
+    font-weight:600;
+    transition:all .3s;
+    cursor:pointer;
+  }
+  .btn:hover{opacity:.9;transform:scale(1.03);}
+  input,button{outline:none;}
+  input{cursor:text;}
+  .neonShadow{
+    box-shadow:0 0 20px #0ff2,0 0 40px #09f2;
+  }
+  #answerArea {
+    background: rgba(0,0,0,0.4);
+    padding: 15px;
+    border-radius: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin-top: 10px;
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body class="p-6">
+
+<header class="text-center mb-10">
+  <h1 class="text-5xl font-bold gradientText">⚡ PDF AI Reader Pro</h1>
+  <p class="text-gray-400 mt-2">Upload → Chat → Get AI Insights — All Secure in Firebase Cloud</p>
+</header>
+
+<div class="max-w-5xl mx-auto space-y-8">
+
+  <!-- AUTH -->
+  <section id="auth-section" class="glass p-8">
+    <div id="signed-out-ui">
+      <h2 class="text-2xl font-semibold mb-4 gradientText">Login / Signup</h2>
+      <div class="grid md:grid-cols-2 gap-8">
+        <div>
+          <input id="email" placeholder="Email" class="w-full bg-black/50 p-3 rounded border border-gray-700 mb-3">
+          <input id="password" type="password" placeholder="Password" class="w-full bg-black/50 p-3 rounded border border-gray-700 mb-3">
+          <div class="flex gap-3">
+            <button id="btnSignup" class="btn">Sign Up</button>
+            <button id="btnLogin" class="btn">Login</button>
+          </div>
+        </div>
+        <div class="text-gray-400 text-sm">
+          Secure Firebase Auth + Storage + LLM integration.<br>
+          Your API keys stay server-side 🔥
+        </div>
+      </div>
+    </div>
+
+    <div id="signed-in-ui" class="hidden">
+      <div class="flex items-center justify-between">
+        <div>
+          <div id="user-email" class="font-semibold"></div>
+          <div id="user-id" class="text-xs text-gray-400"></div>
+        </div>
+        <button id="btnLogout" class="btn">Logout</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="glass p-8 hidden">
+    <h2 class="text-3xl font-semibold gradientText mb-6">Dashboard</h2>
+    <div class="grid md:grid-cols-2 gap-8">
+      <div>
+        <h3 class="font-semibold mb-2">Upload PDF</h3>
+        <input id="fileInput" type="file" accept=".pdf" class="mb-3 w-full text-sm">
+        <button id="btnUpload" class="btn neonShadow">🚀 Upload & Extract</button>
+        <p id="uploadStatus" class="text-sm text-gray-400 mt-2"></p>
+        <div id="answerArea"></div>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Your Documents</h3>
+        <div id="docsList" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <div class="mt-10">
+      <h3 class="font-semibold mb-2">Ask AI about Selected Document</h3>
+      <div class="grid md:grid-cols-3 gap-3">
+        <input id="questionInput" placeholder="Ask something smart..." class="p-3 bg-black/50 border border-gray-700 rounded md:col-span-2">
+        <button id="btnAsk" class="btn">💬 Ask AI</button>
+      </div>
+    </div>
+
+    <div class="mt-10">
+      <h3 class="font-semibold mb-2">Chat History</h3>
+      <div id="historyList" class="space-y-3"></div>
+    </div>
+  </section>
+</div>
+
+<footer class="text-center text-gray-500 text-xs mt-10">© 2025 PDF AI Reader Pro by Ravi — Design by GPT-5 🤖</footer>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+import { 
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/10.6.0/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, query, where, getDocs
+} from "https://www.gstatic.com/firebasejs/10.6.0/firebase-firestore.js";
+import { 
+  getStorage, ref as sRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.6.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDfZMceYwe9hoCk6cKO4Pi8zLsgxjXb7uc",
+  authDomain: "mynetflix-1902e.firebaseapp.com",
+  projectId: "mynetflix-1902e",
+  storageBucket: "mynetflix-1902e.appspot.com",
+  messagingSenderId: "213754965273",
+  appId: "1:213754965273:web:15abebbfbc3fd95716a988",
+  measurementId: "G-FHR2WTDNVZ"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btnSignup=document.getElementById('btnSignup');
+  const btnLogin=document.getElementById('btnLogin');
+  const btnLogout=document.getElementById('btnLogout');
+  const emailEl=document.getElementById('email');
+  const passwordEl=document.getElementById('password');
+  const signedOutUI=document.getElementById('signed-out-ui');
+  const signedInUI=document.getElementById('signed-in-ui');
+  const dashboard=document.getElementById('dashboard');
+  const userEmailEl=document.getElementById('user-email');
+  const userIdEl=document.getElementById('user-id');
+  const fileInput=document.getElementById('fileInput');
+  const btnUpload=document.getElementById('btnUpload');
+  const uploadStatus=document.getElementById('uploadStatus');
+  const docsList=document.getElementById('docsList');
+  const questionInput=document.getElementById('questionInput');
+  const btnAsk=document.getElementById('btnAsk');
+  const answerArea=document.getElementById('answerArea');
+  const historyList=document.getElementById('historyList');
+
+  let currentUser=null; 
+  let currentDoc=null;
+
+  // SIGNUP
+  btnSignup.addEventListener('click', async () => {
+    const email = emailEl.value.trim();
+    const password = passwordEl.value.trim();
+    try { await createUserWithEmailAndPassword(auth,email,password); } 
+    catch(e){ alert(e.message); }
+  });
+
+  // LOGIN
+  btnLogin.addEventListener('click', async () => {
+    const email = emailEl.value.trim();
+    const password = passwordEl.value.trim();
+    try { await signInWithEmailAndPassword(auth,email,password); } 
+    catch(e){ alert(e.message); }
+  });
+
+  // LOGOUT
+  btnLogout.addEventListener('click', async ()=>{ await signOut(auth); });
+
+  // AUTH STATE
+  onAuthStateChanged(auth, async user=>{
+    currentUser=user;
+    if(user){
+      signedOutUI.classList.add('hidden');
+      signedInUI.classList.remove('hidden');
+      dashboard.classList.remove('hidden');
+      userEmailEl.textContent=user.email;
+      userIdEl.textContent=user.uid;
+      await loadDocs();
+    }else{
+      signedOutUI.classList.remove('hidden');
+      signedInUI.classList.add('hidden');
+      dashboard.classList.add('hidden');
+    }
+  });
+
+  // LOAD DOCUMENTS
+  async function loadDocs(){
+    docsList.innerHTML='';
+    if(!currentUser) return;
+    const q=query(collection(db,'documents'),where('ownerId','==',currentUser.uid));
+    const snapshot=await getDocs(q);
+    snapshot.forEach(doc=>{
+      const data=doc.data();
+      const div=document.createElement('div');
+      div.textContent=data.name;
+      div.className="p-2 bg-black/40 rounded cursor-pointer hover:bg-black/60";
+      div.onclick=()=>{ currentDoc=data; answerArea.textContent='📄 PDF Selected: '+data.name; };
+      docsList.appendChild(div);
+    });
+  }
+
+  // UPLOAD & EXTRACT PDF
+  btnUpload.onclick = async () => {
+    const file = fileInput.files[0];
+    if(!file || !currentUser) return alert('Select PDF + Login first!');
+    uploadStatus.textContent='⏳ Uploading & Reading...';
+
+    const path = `pdfs/${currentUser.uid}/${Date.now()}_${file.name}`;
+    const fileRef = sRef(storage, path);
+    try{
+      await uploadBytes(fileRef,file);
+      const url = await getDownloadURL(fileRef);
+      await addDoc(collection(db,'documents'),{
+        ownerId:currentUser.uid,
+        name:file.name,
+        url,
+        createdAt:new Date()
+      });
+
+      // Read PDF client-side
+      const fileReader = new FileReader();
+      fileReader.onload = async function(){
+        const typedArray = new Uint8Array(this.result);
+        const pdf = await pdfjsLib.getDocument(typedArray).promise;
+        let text='';
+        for(let i=1;i<=pdf.numPages;i++){
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const strings = content.items.map(item=>item.str);
+          text += strings.join(' ') + '\n';
+        }
+        answerArea.textContent="📄 PDF Text Extracted:\n\n"+text.slice(0,2000)+(text.length>2000?"...":"");
+      };
+      fileReader.readAsArrayBuffer(file);
+
+      uploadStatus.textContent='✅ Uploaded & Text Extracted!';
+      await loadDocs();
+    }catch(e){
+      uploadStatus.textContent='❌ '+e.message;
+    }
+  };
+
+  // ASK AI (simulated)
+  btnAsk.onclick = () => {
+    if(!currentDoc){ alert('Select a document first!'); return; }
+    const q = questionInput.value.trim();
+    if(!q) return;
+    const ans = "🤖 AI simulated response for: " + q;
+    const div=document.createElement('div');
+    div.className="p-2 bg-black/30 rounded";
+    div.textContent=ans;
+    historyList.prepend(div);
+    questionInput.value='';
+  };
+
+});
+</script>
+
+</body>
+</html>
